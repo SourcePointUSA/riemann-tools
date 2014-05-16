@@ -16,7 +16,7 @@ class Riemann::Tools::NginxEvents
   def initialize
     @uri = URI.parse(opts[:uri])
     @keys = %w{elapsedtime count average rate}
-    @re = /elapsedtime: (\d+)\ncount: (\d+)\naverage: (\d+)\nrate: (\d+)\n/m
+    @re = /elapsedtime: (.+?)\ncount: (.+?)\naverage: (.+?)\nrate: (.+?)\n/m 
     @checks = opts[:checks]
   end
 
@@ -44,7 +44,7 @@ class Riemann::Tools::NginxEvents
           :description => "Nginx events connection ok"
         )
 
-        values = @re.match(response).to_a[1,5].map { |v| v.to_i }
+        values = @re.match(response).to_a[1,5].map { |v| v.to_f }
 
         @keys.zip(values).each do |key, value|
           report({

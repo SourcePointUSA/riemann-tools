@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby
+
+# Gathers nginx status stub statistics and submits them to Riemann.
+# See http://wiki.nginx.org/HttpStubStatusModule for configuring Nginx appropriately
+
+require File.expand_path('../../lib/riemann/tools', __FILE__)
+
+class Riemann::Tools::NginxEvents
+  include Riemann::Tools
+  require 'net/http'
+  require 'uri'
+
+  opt :uri, "Nginx Event Buffer URI", :default => 'http://localhost/event_buffers'
+  opt :checks, "Which events to report.", :type => :strings, :default => %w{beacon capture}
+
+  def initialize
+    @uri = URI.parse(opts[:uri])
+
+    # sample response:
+    #
+    # elapsedtime: 0
+    # count: 0
+    # average: 0
+    # rate: 0
+
+    @keys = %w{elapsedtime count average rate}
+    @re = /elapsedtime: (\d+) \count: (\d+) \average: (\d+) \rate: (\d+) \n/m
+  end
+
+  def state(key, value)
+    return 'ok'
+  end
+
+  def tick
+    response = nil
+    begin
+      response = Net::HTTP.get(@uri)
+    rescue => e
+      report(
+        :service => "nginx events",
+        :state => "critical",
+        :description => "Connection error: #{e.class} - #{e.message}"
+      )
+    end
+
+    return if response.nil?
+
+    report(
+      :service => "nginx events",
+      :state => "ok",
+      :description => "Nginx events connection ok"
+    )
+
+    values = @re.match(response).to_a[1,7].map { |v| v.to_i }
+
+    @keys.zip(values).each do |key, value|
+      report({
+        :service => "nginx #{key}",
+        :metric  => value,
+        :state   => state(key, value),
+        :tags    => ['nginx', 'events']
+      })
+    end
+  end
+end
+
+Riemann::Tools::NginxEvents.run

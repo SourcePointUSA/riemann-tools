@@ -16,7 +16,7 @@ class Riemann::Tools::NginxEvents
   def initialize
     @uri = URI.parse(opts[:uri])
     @keys = %w{elapsedtime count average rate}
-    @re = /elapsedtime: (\d+) \count: (\d+) \average: (\d+) \rate: (\d+) \n/m
+    @re = /elapsedtime: (\d+)\n\count: (\d+)\n\average: (\d+)\n\rate: (\d+)\n/m
     @checks = opts[:checks]
   end
 

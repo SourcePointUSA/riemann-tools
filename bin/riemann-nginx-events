@@ -15,16 +15,9 @@ class Riemann::Tools::NginxEvents
 
   def initialize
     @uri = URI.parse(opts[:uri])
-
-    # sample response:
-    #
-    # elapsedtime: 0
-    # count: 0
-    # average: 0
-    # rate: 0
-
     @keys = %w{elapsedtime count average rate}
     @re = /elapsedtime: (\d+) \count: (\d+) \average: (\d+) \rate: (\d+) \n/m
+    @checks = opts[:checks]
   end
 
   def state(key, value)
@@ -32,36 +25,40 @@ class Riemann::Tools::NginxEvents
   end
 
   def tick
-    response = nil
-    begin
-      response = Net::HTTP.get(@uri)
-    rescue => e
-      report(
-        :service => "nginx events",
-        :state => "critical",
-        :description => "Connection error: #{e.class} - #{e.message}"
-      )
-    end
+      @checks.each {|event_type|
+        response = nil
+        begin
+          response = Net::HTTP.get(URI.parse("#{@uri.to_s}?event_type=#{event_type}"))
+        rescue => e
+          report(
+            :service => "nginx events",
+            :description => "Connection error: #{e.class} - #{e.message} #{event_type}"
+          )
+        end
 
-    return if response.nil?
+        return if response.nil?
 
-    report(
-      :service => "nginx events",
-      :state => "ok",
-      :description => "Nginx events connection ok"
-    )
+        report(
+          :service => "nginx events",
+          :state => "ok",
+          :description => "Nginx events connection ok"
+        )
 
-    values = @re.match(response).to_a[1,7].map { |v| v.to_i }
+        values = @re.match(response).to_a[1,5].map { |v| v.to_i }
 
-    @keys.zip(values).each do |key, value|
-      report({
-        :service => "nginx #{key}",
-        :metric  => value,
-        :state   => state(key, value),
-        :tags    => ['nginx', 'events']
-      })
-    end
+        @keys.zip(values).each do |key, value|
+          report({
+            :service => "nginx #{event_type} #{key}",
+            :metric  => value,
+            :state   => state(key, value),
+            :tags    => ['nginx', 'events', event_type]
+          })
+        end
+      }
+
+
   end
 end
 
 Riemann::Tools::NginxEvents.run
+

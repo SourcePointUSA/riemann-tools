@@ -11,7 +11,7 @@ class Riemann::Tools::NginxEvents
   require 'uri'
 
   opt :uri, "Nginx Event Buffer URI", :default => 'http://localhost/event_buffers'
-  opt :checks, "Which events to report.", :type => :strings, :default => %w{beacon capture}
+  opt :checks, "Which events to report.", :type => :strings, :default => %w{beacon beacon_response_time}
 
   def initialize
     @uri = URI.parse(opts[:uri])
